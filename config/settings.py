@@ -179,6 +179,9 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
+# КЛЮЧЕВАЯ НАСТРОЙКА!
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
 # ==================== НАСТРОЙКИ DEBUG TOOLBAR ====================
 DEBUG_TOOLBAR_CONFIG = {
     'SHOW_TOOLBAR_CALLBACK': lambda request: True,  # Показывать панель на всех страницах
