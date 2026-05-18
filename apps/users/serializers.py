@@ -8,9 +8,11 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'first_name', 'last_name',
-                  'telegram_chat_id', 'telegram_notifications', 'phone',
-                  'city', 'avatar', 'date_joined']
+        fields = [
+            'id', 'email', 'username', 'first_name', 'last_name',
+            'telegram_chat_id', 'telegram_notifications', 'phone',
+            'city', 'avatar', 'user_timezone', 'date_joined'
+        ]
         read_only_fields = ['id', 'date_joined']
 
 
@@ -21,7 +23,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['email', 'username', 'password', 'password2', 'first_name', 'last_name']
+        fields = ['email', 'username', 'password', 'password2', 'first_name', 'last_name', 'user_timezone']
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
@@ -48,6 +50,11 @@ class TelegramChatIdSerializer(serializers.Serializer):
 class SetTelegramNotificationsSerializer(serializers.Serializer):
     """Сериализатор для настройки Telegram уведомлений"""
     enabled = serializers.BooleanField(required=True)
+
+
+class SetTimezoneSerializer(serializers.Serializer):
+    """Сериализатор для установки часового пояса"""
+    user_timezone = serializers.CharField(max_length=50, required=True)
 
 
 class PaymentSerializer(serializers.ModelSerializer):
