@@ -2,6 +2,7 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from django.utils import timezone
 from .managers import UserManager
+import pytz
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -22,6 +23,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     phone = models.CharField(max_length=35, blank=True, null=True, verbose_name='Телефон')
     city = models.CharField(max_length=100, blank=True, null=True, verbose_name='Город')
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True, verbose_name='Аватар')
+
+    # Часовой пояс пользователя
+    user_timezone = models.CharField(
+        max_length=50,
+        default='Europe/Moscow',
+        choices=[(tz, tz) for tz in pytz.common_timezones],
+        verbose_name='Часовой пояс'
+    )
 
     # Статусы
     is_staff = models.BooleanField(default=False, verbose_name='Staff status')
