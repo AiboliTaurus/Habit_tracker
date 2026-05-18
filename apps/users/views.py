@@ -1,11 +1,12 @@
-from rest_framework import generics, status, viewsets
+from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from drf_yasg.utils import swagger_auto_schema
 from .serializers import (
     UserSerializer, RegisterSerializer, LoginSerializer,
-    TelegramChatIdSerializer, SetTelegramNotificationsSerializer
+    TelegramChatIdSerializer, SetTelegramNotificationsSerializer,
+    SetTimezoneSerializer
 )
 
 
@@ -108,6 +109,26 @@ class SetTelegramNotificationsView(generics.UpdateAPIView):
         return Response({
             'message': f'Telegram уведомления {"включены" if user.telegram_notifications else "выключены"}',
             'telegram_notifications': user.telegram_notifications
+        })
+
+
+class SetTimezoneView(generics.UpdateAPIView):
+    """Установка часового пояса пользователя"""
+    serializer_class = SetTimezoneSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def patch(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user.user_timezone = serializer.validated_data['user_timezone']
+        user.save()
+        return Response({
+            'message': f'Часовой пояс установлен: {user.user_timezone}',
+            'user_timezone': user.user_timezone
         })
 
 
