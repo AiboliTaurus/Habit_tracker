@@ -1,9 +1,10 @@
 from celery import shared_task
 from datetime import date, timedelta
+from django.utils import timezone as django_timezone
 from apps.habits.models import Habit, HabitExecution
-from apps.users.models import User
 from .bot import send_reminder
 import logging
+import pytz
 
 logger = logging.getLogger(__name__)
 
@@ -48,16 +49,10 @@ def process_habit_reminders():
     Обработка и отправка напоминаний о привычках.
     Проверяет периодичность и отправляет только те привычки,
     которые нужно выполнить сегодня.
+    Учитывает часовой пояс пользователя.
     """
-    from django.utils import timezone
-
-    current_time = timezone.localtime(timezone.now()).time()
-    today = date.today()
-
-    # Получаем привычки, у которых время совпадает с текущим
+    now = django_timezone.now()
     habits = Habit.objects.filter(
-        time__hour=current_time.hour,
-        time__minute=current_time.minute,
         user__telegram_chat_id__isnull=False,
         user__telegram_notifications=True,
         user__is_active=True,
@@ -67,29 +62,39 @@ def process_habit_reminders():
 
     sent_count = 0
     for habit in habits:
-        # Проверяем, нужно ли выполнять привычку сегодня (с учетом периодичности)
-        if should_execute_today(habit, today):
-            # Проверяем, не выполнена ли уже привычка сегодня
-            execution = HabitExecution.objects.filter(
-                habit=habit,
-                execution_date=today
-            ).first()
+        # Получаем часовой пояс пользователя
+        user_tz = pytz.timezone(habit.user.user_timezone) if habit.user.user_timezone else pytz.timezone(
+            'Europe/Moscow')
+        user_now = now.astimezone(user_tz)
+        current_time = user_now.time()
+        today = user_now.date()
 
-            # Отправляем напоминание, если привычка еще не выполнена
-            if not execution or execution.status != 'completed':
-                habit_data = {
-                    'action': habit.action,
-                    'place': habit.place,
-                    'execution_time': habit.execution_time,
-                    'reward': habit.reward,
-                    'related_habit_action': habit.related_habit.action if habit.related_habit else None,
-                    'periodicity': habit.get_periodicity_display(),
-                }
+        # Проверяем, совпадает ли время привычки с текущим временем пользователя
+        if habit.time.hour == current_time.hour and habit.time.minute == current_time.minute:
+            # Проверяем, нужно ли выполнять привычку сегодня (с учетом периодичности)
+            if should_execute_today(habit, today):
+                # Проверяем, не выполнена ли уже привычка сегодня
+                execution = HabitExecution.objects.filter(
+                    habit=habit,
+                    execution_date=today
+                ).first()
 
-                result = send_reminder(habit.user.telegram_chat_id, habit_data)
-                if result:
-                    sent_count += 1
-                    logger.info(f"Reminder sent for habit {habit.id} to user {habit.user.email}")
+                # Отправляем напоминание, если привычка еще не выполнена
+                if not execution or execution.status != 'completed':
+                    habit_data = {
+                        'action': habit.action,
+                        'place': habit.place,
+                        'execution_time': habit.execution_time,
+                        'reward': habit.reward,
+                        'related_habit_action': habit.related_habit.action if habit.related_habit else None,
+                        'periodicity': habit.get_periodicity_display(),
+                        'local_time': current_time.strftime('%H:%M'),
+                    }
+
+                    result = send_reminder(habit.user.telegram_chat_id, habit_data)
+                    if result:
+                        sent_count += 1
+                        logger.info(f"Reminder sent for habit {habit.id} to user {habit.user.email}")
 
     logger.info(f"Sent {sent_count} reminders")
     return sent_count
@@ -100,19 +105,62 @@ def check_missed_habits():
     """
     Проверка пропущенных привычек.
     Отмечает как пропущенные привычки, которые не были выполнены в срок.
+    Учитывает часовой пояс пользователя.
     """
-    yesterday = date.today() - timedelta(days=1)
+    now = django_timezone.now()
+    habits = Habit.objects.filter(
+        user__telegram_chat_id__isnull=False,
+        user__telegram_notifications=True,
+        is_pleasant=False
+    ).select_related('user')
 
-    # Находим все невыполненные привычки за вчерашний день
-    missed_executions = HabitExecution.objects.filter(
-        execution_date=yesterday,
-        status='pending'
-    )
+    marked_count = 0
+    for habit in habits:
+        user_tz = pytz.timezone(habit.user.user_timezone) if habit.user.user_timezone else pytz.timezone(
+            'Europe/Moscow')
+        user_today = now.astimezone(user_tz).date()
 
-    # Отмечаем их как пропущенные
-    count = missed_executions.update(status='skipped')
+        # Проверяем, есть ли запись о выполнении за сегодня
+        execution = HabitExecution.objects.filter(
+            habit=habit,
+            execution_date=user_today
+        ).first()
 
-    if count > 0:
-        logger.info(f"Marked {count} habits as skipped for {yesterday}")
+        # Если записи нет, создаём со статусом "пропущено"
+        if not execution:
+            # Проверяем, нужно ли было выполнять привычку сегодня
+            periodicity_days = {
+                'daily': 1,
+                'every_2_days': 2,
+                'every_3_days': 3,
+                'every_4_days': 4,
+                'every_5_days': 5,
+                'every_6_days': 6,
+                'weekly': 7,
+            }
+            days = periodicity_days.get(habit.periodicity, 1)
 
-    return count
+            # Получаем последнее выполнение
+            last_execution = HabitExecution.objects.filter(
+                habit=habit,
+                status='completed'
+            ).order_by('-execution_date').first()
+
+            should_have_executed = False
+            if not last_execution:
+                should_have_executed = True
+            else:
+                next_date = last_execution.execution_date + timedelta(days=days)
+                if user_today >= next_date:
+                    should_have_executed = True
+
+            if should_have_executed:
+                HabitExecution.objects.create(
+                    habit=habit,
+                    execution_date=user_today,
+                    status='skipped'
+                )
+                marked_count += 1
+                logger.info(f"Marked habit {habit.id} as skipped for {user_today}")
+
+    return marked_count
