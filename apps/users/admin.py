@@ -5,8 +5,8 @@ from .models import User, Payment
 
 @admin.register(User)
 class CustomUserAdmin(BaseUserAdmin):
-    list_display = ('email', 'username', 'telegram_chat_id', 'telegram_notifications', 'is_active', 'is_staff')
-    list_filter = ('is_active', 'is_staff', 'telegram_notifications', 'date_joined')
+    list_display = ('email', 'username', 'telegram_chat_id', 'telegram_notifications', 'user_timezone', 'is_active', 'is_staff')
+    list_filter = ('is_active', 'is_staff', 'telegram_notifications', 'user_timezone', 'date_joined')
     search_fields = ('email', 'username', 'telegram_chat_id')
     ordering = ('email',)
 
@@ -14,6 +14,7 @@ class CustomUserAdmin(BaseUserAdmin):
         (None, {'fields': ('email', 'username', 'password')}),
         ('Personal info', {'fields': ('first_name', 'last_name', 'phone', 'city', 'avatar')}),
         ('Telegram', {'fields': ('telegram_chat_id', 'telegram_notifications')}),
+        ('Timezone', {'fields': ('user_timezone',)}),
         ('Permissions',
          {'fields': ('is_active', 'is_staff', 'is_superuser', 'is_blocked', 'groups', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'last_activity', 'date_joined')}),
