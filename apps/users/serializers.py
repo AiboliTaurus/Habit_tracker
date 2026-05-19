@@ -36,12 +36,6 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
-class LoginSerializer(serializers.Serializer):
-    """Сериализатор для входа"""
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)
-
-
 class TelegramChatIdSerializer(serializers.Serializer):
     """Сериализатор для установки Telegram Chat ID"""
     telegram_chat_id = serializers.CharField(max_length=100, required=True)
