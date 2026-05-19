@@ -1,5 +1,5 @@
 from celery import shared_task
-from datetime import date, timedelta
+from datetime import timedelta
 from django.utils import timezone as django_timezone
 from apps.habits.models import Habit, HabitExecution
 from .bot import send_reminder

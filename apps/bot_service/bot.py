@@ -2,8 +2,6 @@ import logging
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, ContextTypes
 from django.conf import settings
-from asgiref.sync import sync_to_async
-from apps.users.models import User
 
 logger = logging.getLogger(__name__)
 
